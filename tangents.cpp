@@ -11,7 +11,7 @@ Features:
 - Frequency response curve display
 - Full custom UI with pots and encoders
 
-GUID: NsTg (NealSanche + Tangents)
+GUID: ThTa (Thorinside + Tangents)
 */
 
 #include <distingnt/api.h>
@@ -815,7 +815,7 @@ void setupUi(_NT_algorithm* self, _NT_float3& pots)
 
 static const _NT_factory factory =
 {
-	.guid = NT_MULTICHAR('N', 's', 'T', 'g'),  // NealSanche + Tangents
+	.guid = NT_MULTICHAR('T', 'h', 'T', 'a'),  // Thorinside + Tangents
 	.name = "Tangents",
 	.description = "Steiner-Parker multimode filter",
 	.numSpecifications = 0,
