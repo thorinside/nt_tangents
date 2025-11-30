@@ -8,9 +8,9 @@ Steiner-Parker multimode filter plugin for Expert Sleepers disting NT.
 make
 ```
 
-Output: `build/tangents.dntp`
+Output: `plugins/tangents.o`
 
-Copy to SD card `plugins/` folder.
+Copy to disting NT SD card root folder.
 
 ## Controls
 
