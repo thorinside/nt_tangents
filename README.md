@@ -10,7 +10,7 @@ make
 
 Output: `plugins/tangents.o`
 
-Copy to disting NT SD card root folder.
+Copy to `/programs/plug-ins/` on the disting NT SD card.
 
 ## Controls
 
