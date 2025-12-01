@@ -111,6 +111,16 @@ enum
 	kNumParameters
 };
 
+// Filter mode enum
+enum FilterMode
+{
+	kFilterModeLowpass = 0,
+	kFilterModeBandpass,
+	kFilterModeHighpass,
+	kFilterModeAllpass,
+	kNumFilterModes
+};
+
 static char const * const enumStringsMode[] = {
 	"Lowpass",
 	"Bandpass",
@@ -143,9 +153,9 @@ static const _NT_parameter parameters[] = {
 	// Filter controls
 	// kNT_scaling10 means host displays raw/10 (e.g., raw 1000 shows as "100.0%")
 	// Plugin always receives raw integer values in v[]
-	{ .name = "Cutoff", .min = 20, .max = 20000, .def = 1000, .unit = kNT_unitHz, .scaling = kNT_scalingNone, .enumStrings = NULL },
+	{ .name = "Cutoff", .min = 20, .max = 12000, .def = 1000, .unit = kNT_unitHz, .scaling = kNT_scalingNone, .enumStrings = NULL },
 	{ .name = "Resonance", .min = 0, .max = 1000, .def = 0, .unit = kNT_unitPercent, .scaling = kNT_scaling10, .enumStrings = NULL },
-	{ .name = "Mode", .min = 0, .max = 3, .def = 0, .unit = kNT_unitEnum, .scaling = kNT_scalingNone, .enumStrings = NULL },
+	{ .name = "Mode", .min = 0, .max = kNumFilterModes - 1, .def = kFilterModeLowpass, .unit = kNT_unitEnum, .scaling = kNT_scalingNone, .enumStrings = enumStringsMode },
 	{ .name = "Model", .min = 0, .max = 2, .def = 0, .unit = kNT_unitEnum, .scaling = kNT_scalingNone, .enumStrings = enumStringsModel },
 
 	// CV inputs - kNT_scaling10 gives 0.1% resolution
@@ -434,7 +444,7 @@ void step(_NT_algorithm* self, float* busFrames, int numFramesBy4)
 	// With kNT_scaling10: raw 0-1000 displays as 0.0-100.0%
 	float baseCutoff = (float)pThis->v[kParamCutoff];            // 20 - 20000 Hz
 	float baseResonance = pThis->v[kParamResonance] / 1000.0f;   // 0.0 - 1.0 (raw 0-1000)
-	int mode = pThis->v[kParamMode];
+	FilterMode mode = (FilterMode)pThis->v[kParamMode];
 	int model = pThis->v[kParamModel];  // 0=YU, 1=MS, 2=XX
 	float cvCutoffAmtTarget = pThis->v[kParamCvCutoffAmt] / 1000.0f;     // -1.0 to 1.0 (raw -1000 to 1000)
 	float cvResAmtTarget = pThis->v[kParamCvResonanceAmt] / 1000.0f;     // -1.0 to 1.0 (raw -1000 to 1000)
@@ -552,17 +562,20 @@ void step(_NT_algorithm* self, float* busFrames, int numFramesBy4)
 			// Accumulate output based on mode (for oversampling averaging)
 			switch (mode)
 			{
-				case 0:  // Lowpass
+				case kFilterModeLowpass:
 					output += lp;
 					break;
-				case 1:  // Bandpass
+				case kFilterModeBandpass:
 					output += bp;
 					break;
-				case 2:  // Highpass
+				case kFilterModeHighpass:
 					output += hp;
 					break;
-				case 3:  // All-pass (LP - HP)
+				case kFilterModeAllpass:
 					output += lp - hp;
+					break;
+				default:
+					output += lp;
 					break;
 			}
 		}
@@ -620,7 +633,7 @@ bool draw(_NT_algorithm* self)
 
 	// Draw mode
 	const char* modeNames[] = {"LP", "BP", "HP", "AP"};
-	int mode = pThis->v[kParamMode];
+	FilterMode mode = (FilterMode)pThis->v[kParamMode];
 	NT_drawText(95, 8, modeNames[mode], 12);
 
 	// Draw frequency response curve approximation
@@ -648,17 +661,17 @@ bool draw(_NT_algorithm* self)
 
 		switch (mode)
 		{
-			case 0:  // LP
+			case kFilterModeLowpass:
 				response = 1.0f / sqrtf(1.0f + freqRatio * freqRatio * freqRatio * freqRatio);
 				break;
-			case 1:  // BP
+			case kFilterModeBandpass:
 				response = freqRatio / (1.0f + freqRatio * freqRatio);
 				if (resonance > 50.0f) response *= 1.0f + (resonance - 50.0f) / 25.0f;
 				break;
-			case 2:  // HP
+			case kFilterModeHighpass:
 				response = freqRatio * freqRatio / sqrtf(1.0f + freqRatio * freqRatio * freqRatio * freqRatio);
 				break;
-			case 3:  // AP
+			case kFilterModeAllpass:
 				response = 0.5f;  // Flat magnitude
 				break;
 			default:
@@ -741,13 +754,13 @@ void customUi(_NT_algorithm* self, const _NT_uiData& data)
 	}
 
 	// Center pot: Cutoff (logarithmic mapping)
-	// Integer Hz, range 20-20000
+	// Integer Hz, range 20-12000
 	if (data.controls & kNT_potC)
 	{
-		// Logarithmic mapping: 20Hz to 20kHz
+		// Logarithmic mapping: 20Hz to 12kHz
 		float potVal = data.pots[1];
-		int value = (int)(20.0f * powf(1000.0f, potVal));
-		if (value > 20000) value = 20000;
+		int value = (int)(20.0f * powf(600.0f, potVal));
+		if (value > 12000) value = 12000;
 		if (value < 20) value = 20;
 		NT_setParameterFromUi(NT_algorithmIndex(self),
 		                     kParamCutoff + NT_parameterOffset(),
@@ -764,28 +777,28 @@ void customUi(_NT_algorithm* self, const _NT_uiData& data)
 		                     value);
 	}
 
-	// Left encoder: Mode selection (LP/BP/HP/AP)
+	// Left encoder: Model selection (YU/MS/XX)
 	if (data.encoders[0] != 0)
 	{
-		int mode = pThis->v[kParamMode];
-		mode += data.encoders[0];
-		if (mode < 0) mode = 3;
-		if (mode > 3) mode = 0;
-		NT_setParameterFromUi(NT_algorithmIndex(self),
-		                     kParamMode + NT_parameterOffset(),
-		                     mode);
-	}
-
-	// Right encoder: Model selection (YU/MS/XX)
-	if (data.encoders[1] != 0)
-	{
 		int model = pThis->v[kParamModel];
-		model += data.encoders[1];
+		model += data.encoders[0];
 		if (model < 0) model = 2;
 		if (model > 2) model = 0;
 		NT_setParameterFromUi(NT_algorithmIndex(self),
 		                     kParamModel + NT_parameterOffset(),
 		                     model);
+	}
+
+	// Right encoder: Mode selection (LP/BP/HP/AP)
+	if (data.encoders[1] != 0)
+	{
+		int mode = pThis->v[kParamMode];
+		mode += data.encoders[1];
+		if (mode < 0) mode = kNumFilterModes - 1;
+		if (mode >= kNumFilterModes) mode = 0;
+		NT_setParameterFromUi(NT_algorithmIndex(self),
+		                     kParamMode + NT_parameterOffset(),
+		                     mode);
 	}
 }
 
@@ -799,9 +812,9 @@ void setupUi(_NT_algorithm* self, _NT_float3& pots)
 	// Left pot: Input AGR (raw 0-1000 = display 0.0-100.0)
 	pots[0] = pThis->v[kParamInputAGR] / 1000.0f;
 
-	// Center pot: Cutoff (logarithmic, integer Hz 20-20000)
+	// Center pot: Cutoff (logarithmic, integer Hz 20-12000)
 	float cutoff = (float)pThis->v[kParamCutoff];
-	pots[1] = log10f(cutoff / 20.0f) / 3.0f;  // 3 = log10(1000)
+	pots[1] = log10f(cutoff / 20.0f) / log10f(600.0f);  // 600 = 12000/20
 	if (pots[1] < 0.0f) pots[1] = 0.0f;
 	if (pots[1] > 1.0f) pots[1] = 1.0f;
 
