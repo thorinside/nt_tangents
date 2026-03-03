@@ -202,10 +202,10 @@ static const uint8_t pageRouting[] = {
 };
 
 static const _NT_parameterPage pages[] = {
-	{ .name = "Filter", .numParams = ARRAY_SIZE(pageFilter), .params = pageFilter },
-	{ .name = "Input", .numParams = ARRAY_SIZE(pageInput), .params = pageInput },
-	{ .name = "CV", .numParams = ARRAY_SIZE(pageCV), .params = pageCV },
-	{ .name = "Routing", .numParams = ARRAY_SIZE(pageRouting), .params = pageRouting },
+	{ .name = "Filter", .numParams = ARRAY_SIZE(pageFilter), .group = 0, .unused = {}, .params = pageFilter },
+	{ .name = "Input", .numParams = ARRAY_SIZE(pageInput), .group = 0, .unused = {}, .params = pageInput },
+	{ .name = "CV", .numParams = ARRAY_SIZE(pageCV), .group = 0, .unused = {}, .params = pageCV },
+	{ .name = "Routing", .numParams = ARRAY_SIZE(pageRouting), .group = 0, .unused = {}, .params = pageRouting },
 };
 
 static const _NT_parameterPages parameterPages = {
